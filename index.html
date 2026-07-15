@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trang chủ · TAIKISHA FA Manager</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="app-shell" id="app-shell"></div>
+
+<script src="assets/data/master.js"></script>
+<script src="assets/data/broken.js"></script>
+<script src="assets/data/record.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+renderShell("home", "Trang chủ", "Danh mục chức năng — tương đương sheet INDEX trong file Excel gốc");
+
+async function boot() {
+  const el = document.getElementById("page-content");
+
+  const total = MASTER_DATA.length;
+  const inUse = MASTER_DATA.filter(x => (x.status || "").toLowerCase() === "use").length;
+  const spare = MASTER_DATA.filter(x => (x.status || "").toLowerCase() === "spare").length;
+  const brokenAssets = MASTER_DATA.filter(x => (x.status || "").toLowerCase() === "broken").length;
+  const brokenLog = await idbAll("brokenLog");
+  const attachments = await idbAll("attachments");
+
+  el.innerHTML = `
+    <div class="note-banner">
+      ⚙️ Ứng dụng chạy hoàn toàn trên trình duyệt (không có máy chủ). Dữ liệu gốc từ file Excel được nhúng sẵn;
+      các bản ghi mới (thiết bị hỏng, file PDF đính kèm...) được lưu cục bộ trong trình duyệt này bằng IndexedDB.
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat-box"><div class="num">${total}</div><div class="lbl">Tổng tài sản (Data)</div></div>
+      <div class="stat-box ok"><div class="num">${inUse}</div><div class="lbl">Đang sử dụng</div></div>
+      <div class="stat-box"><div class="num">${spare}</div><div class="lbl">Dự phòng (Spare)</div></div>
+      <div class="stat-box warn"><div class="num">${brokenAssets + brokenLog.length + BROKEN_SEED.length}</div><div class="lbl">Hỏng đã ghi nhận</div></div>
+      <div class="stat-box accent"><div class="num">${attachments.length}</div><div class="lbl">File PDF đã tải lên</div></div>
+    </div>
+
+    <div class="nav-group-label" style="margin-left:0">DỮ LIỆU TÀI SẢN</div>
+    <div class="tile-grid">
+      <a class="tile" href="data.html">
+        <span class="tile-code">DATA + FA-REPORT</span>
+        <h3>Data chung</h3>
+        <p>Gộp sheet <b>Data</b> &amp; <b>FA-Report</b> thành 1 bảng: thông tin tài sản, khấu hao theo tháng 2026, mã Job.</p>
+        <span class="tag">${total} tài sản</span>
+      </a>
+      <a class="tile" href="data.html?new=1">
+        <span class="tile-code">FORM INPUT</span>
+        <h3>Nhập liệu tài sản mới</h3>
+        <p>Form thêm tài sản cố định / công cụ dụng cụ mới vào Data chung.</p>
+      </a>
+      <a class="tile" href="record.html">
+        <span class="tile-code">RECORD</span>
+        <h3>Lịch sử cấp phát</h3>
+        <p>Lịch sử luân chuyển vị trí / người sử dụng theo từng tài sản (sheet Record).</p>
+        <span class="tag">${RECORD_DATA.length.toLocaleString("vi-VN")} dòng</span>
+      </a>
+      <a class="tile" href="search.html">
+        <span class="tile-code">SEARCH · SECRETARY</span>
+        <h3>Tra cứu theo Site Manager</h3>
+        <p>Chọn 1 người quản lý để xem toàn bộ tài sản đang được phân bổ (thay cho sheet Search &amp; Secretary_Record).</p>
+      </a>
+    </div>
+
+    <div class="nav-group-label" style="margin-left:0">SỰ CỐ / THẤT LẠC</div>
+    <div class="tile-grid">
+      <a class="tile" href="broken.html">
+        <span class="tile-code">BROKEN</span>
+        <h3>Thiết bị hỏng</h3>
+        <p>Ghi nhận thiết bị hỏng mới, đính kèm biên bản (PDF) và xem lại lịch sử.</p>
+        <span class="tag">${BROKEN_SEED.length + brokenLog.length} bản ghi</span>
+      </a>
+      <a class="tile" href="lost.html">
+        <span class="tile-code">LOST</span>
+        <h3>Thất lạc</h3>
+        <p>Ghi nhận tài sản thất lạc / báo mất kèm biên bản đính kèm.</p>
+      </a>
+    </div>
+
+    <div class="nav-group-label" style="margin-left:0">TÀI LIỆU ISO &amp; TIỆN ÍCH</div>
+    <div class="tile-grid">
+      <a class="tile" href="iso.html">
+        <span class="tile-code">GA-AD-A20-2-1</span>
+        <h3>Fixed Asset Card</h3>
+        <p>Thẻ tài sản cố định (theo TT 200/2014/QĐ-BTC) — tải lên bản PDF đã ký cho từng tài sản.</p>
+      </a>
+      <a class="tile" href="iso.html">
+        <span class="tile-code">GA-AD-A20-2-2</span>
+        <h3>Equipment Card</h3>
+        <p>Thẻ công cụ dụng cụ — đính kèm PDF theo mã tài sản.</p>
+      </a>
+      <a class="tile" href="iso.html">
+        <span class="tile-code">GA-AD-A20-3</span>
+        <h3>Hand-over Memo</h3>
+        <p>Biên bản bàn giao tài sản / thiết bị — đính kèm PDF theo mã tài sản.</p>
+      </a>
+      <a class="tile disabled" href="#">
+        <span class="tile-code">SEND-MAIL</span>
+        <h3>Gửi email</h3>
+        <p>Chức năng macro gửi mail của file gốc — cấu hình theo hộp thư công ty (chưa kết nối).</p>
+      </a>
+    </div>
+  `;
+}
+boot();
+</script>
+</body>
+</html>

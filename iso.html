@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tài liệu ISO · TAIKISHA FA Manager</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="app-shell" id="app-shell"></div>
+<div class="modal-backdrop" id="upload-backdrop"><div class="modal" id="upload-modal"></div></div>
+
+<script src="assets/data/master.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+renderShell("iso", "Tài liệu ISO", "Biểu mẫu theo Thông tư 200/2014/QĐ-BTC — tải lên bản PDF đã ký cho từng tài sản");
+
+const ISO_FORMS = [
+  { code: "GA-AD-A20-2-1", name: "Fixed Asset Card", vi: "Thẻ tài sản cố định" },
+  { code: "GA-AD-A20-2-2", name: "Equipment Card", vi: "Thẻ công cụ dụng cụ" },
+  { code: "GA-AD-A20-3", name: "Hand-over Memo", vi: "Biên bản bàn giao tài sản/thiết bị" },
+];
+
+async function boot() {
+  document.getElementById("topbar-actions").innerHTML = `<button class="btn btn-primary" id="btn-upload">+ Tải lên PDF</button>`;
+  document.getElementById("btn-upload").onclick = () => openUploadForm();
+
+  render();
+  await renderLibrary();
+
+  const params = new URLSearchParams(location.search);
+  if (params.get("code")) openUploadForm(params.get("code"), params.get("form") || "");
+}
+
+function render() {
+  document.getElementById("page-content").innerHTML = `
+    <div class="tile-grid" style="margin-bottom:24px">
+      ${ISO_FORMS.map(f => `
+        <div class="tile">
+          <span class="tile-code">${f.code}</span>
+          <h3>${f.name}</h3>
+          <p>${f.vi}</p>
+          <button class="btn btn-sm btn-primary" style="align-self:flex-start" onclick="openUploadForm('', '${f.code}')">+ Tải PDF cho biểu mẫu này</button>
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="panel">
+      <div class="toolbar">
+        <div class="field grow"><label>Tìm kiếm</label><input type="search" id="f-q" placeholder="Tên file, mã tài sản..."></div>
+        <div class="field">
+          <label>Loại biểu mẫu</label>
+          <select id="f-type">
+            <option value="">Tất cả</option>
+            ${ISO_FORMS.map(f => `<option value="${f.code}">${f.code}</option>`).join("")}
+            <option value="Tài liệu chung">Tài liệu chung</option>
+            <option value="Biên bản thiết bị hỏng">Biên bản thiết bị hỏng</option>
+            <option value="Biên bản thất lạc">Biên bản thất lạc</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Loại biểu mẫu</th><th>Tài sản</th><th>Ngày tải lên</th><th></th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.getElementById("f-q").addEventListener("input", renderLibrary);
+  document.getElementById("f-type").addEventListener("change", renderLibrary);
+}
+
+async function renderLibrary() {
+  const q = (document.getElementById("f-q")?.value || "").trim().toLowerCase();
+  const type = document.getElementById("f-type")?.value || "";
+  const all = await idbAll("attachments");
+  const rows = all.filter(it => {
+    if (type && it.formType !== type) return false;
+    if (q && !([it.fileName, it.assetCode, it.assetName].join(" ").toLowerCase().includes(q))) return false;
+    return true;
+  }).sort((a, b) => (b.uploadedAt || "").localeCompare(a.uploadedAt || ""));
+
+  const tbody = document.getElementById("tbody");
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><h3>Chưa có tài liệu PDF nào</h3>Tải lên biểu mẫu ISO hoặc biên bản đã ký ở trên.</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(it => `
+    <tr>
+      <td>📄 ${esc(it.fileName)}</td>
+      <td>${esc(it.formType) || "—"}</td>
+      <td>${esc(it.assetName) || "—"} ${it.assetCode ? `<span class="mono" style="color:var(--steel-500);font-size:11px">(${esc(it.assetCode)})</span>` : ""}</td>
+      <td>${new Date(it.uploadedAt).toLocaleString("vi-VN")}</td>
+      <td style="text-align:right">
+        <button class="btn btn-sm btn-ghost" data-view="${it.id}">Xem</button>
+        <button class="btn btn-sm btn-ghost" data-del="${it.id}">Xóa</button>
+      </td>
+    </tr>
+  `).join("");
+  tbody.querySelectorAll("button[data-view]").forEach(b => b.onclick = () => {
+    const it = rows.find(x => x.id === b.dataset.view);
+    window.open(it.dataUrl, "_blank");
+  });
+  tbody.querySelectorAll("button[data-del]").forEach(b => b.onclick = async () => {
+    await idbDelete("attachments", b.dataset.del);
+    toast("Đã xóa tài liệu");
+    renderLibrary();
+  });
+}
+
+function openUploadForm(prefCode, prefForm) {
+  const backdrop = document.getElementById("upload-backdrop");
+  const modal = document.getElementById("upload-modal");
+  const assetOptions = MASTER_DATA.map(a => `<option value="${esc(a.code)}" ${a.code === prefCode ? "selected" : ""}>${esc(a.name)} — ${esc(a.code)}</option>`).join("");
+  const formOptions = ISO_FORMS.map(f => `<option value="${f.code}" ${f.code === prefForm ? "selected" : ""}>${f.code} · ${f.name}</option>`)
+    .concat([`<option value="Tài liệu chung" ${prefForm === "Tài liệu chung" ? "selected" : ""}>Tài liệu chung khác</option>`]).join("");
+
+  modal.innerHTML = `
+    <div class="modal-head"><h3>Tải lên tài liệu PDF</h3><button class="close" id="close-upload">✕</button></div>
+    <div class="modal-body">
+      <form id="upload-form">
+        <div class="form-grid">
+          <div class="field full"><label>Loại biểu mẫu</label><select name="formType">${formOptions}</select></div>
+          <div class="field full">
+            <label>Gắn với tài sản (tùy chọn)</label>
+            <select name="code"><option value="">— Không gắn với tài sản cụ thể —</option>${assetOptions}</select>
+          </div>
+          <div class="field full">
+            <label>Chọn file PDF *</label>
+            <input type="file" name="pdf" accept="application/pdf" required>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn" id="cancel-upload">Hủy</button>
+          <button type="submit" class="btn btn-primary">Tải lên</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.getElementById("close-upload").onclick = () => backdrop.classList.remove("open");
+  document.getElementById("cancel-upload").onclick = () => backdrop.classList.remove("open");
+  document.getElementById("upload-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const file = fd.get("pdf");
+    if (!file || file.size === 0) { toast("Vui lòng chọn file PDF.", true); return; }
+    if (file.type !== "application/pdf") { toast("Chỉ chấp nhận file PDF.", true); return; }
+    const code = fd.get("code");
+    const asset = MASTER_DATA.find(a => a.code === code);
+    const dataUrl = await fileToDataUrl(file);
+    await idbPut("attachments", {
+      id: uid(), assetCode: code || "", assetName: asset ? asset.name : "",
+      formType: fd.get("formType"), fileName: file.name, mimeType: file.type,
+      dataUrl, uploadedAt: new Date().toISOString(),
+    });
+    toast("Đã tải lên " + file.name);
+    backdrop.classList.remove("open");
+    renderLibrary();
+  };
+  backdrop.classList.add("open");
+}
+
+document.getElementById("upload-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "upload-backdrop") e.currentTarget.classList.remove("open");
+});
+
+boot();
+</script>
+</body>
+</html>

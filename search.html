@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tra cứu theo Site Manager · TAIKISHA FA Manager</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="app-shell" id="app-shell"></div>
+<script src="assets/data/master.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+renderShell("search", "Tra cứu theo Site Manager", "Thay thế sheet Search &amp; Secretary_Record — chọn 1 người quản lý để xem toàn bộ tài sản");
+
+function renderContent() {
+  const managers = [...new Set(MASTER_DATA.map(a => (a.siteManager || "").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"vi"));
+
+  document.getElementById("page-content").innerHTML = `
+    <div class="panel">
+      <div class="toolbar">
+        <div class="field grow" style="max-width:360px">
+          <label>Chọn tên Site Manager</label>
+          <select id="f-manager">
+            <option value="">— Chọn Site Manager —</option>
+            ${managers.map(m => `<option>${esc(m)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field grow">
+          <label>Hoặc tìm theo tên / mã tài sản</label>
+          <input type="search" id="f-q" placeholder="Nhập từ khóa...">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>No</th><th>Tên tài sản</th><th>Mã</th><th>Trạng thái</th><th>Vị trí</th><th>Người dùng</th><th>Nguyên giá</th><th>Còn lại 2026</th></tr></thead>
+          <tbody id="tbody"><tr><td colspan="8"><div class="empty-state"><h3>Chọn một Site Manager phía trên</h3>hoặc gõ từ khóa để tìm kiếm trên toàn bộ Data chung.</div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("f-manager").addEventListener("change", refresh);
+  document.getElementById("f-q").addEventListener("input", refresh);
+}
+
+function refresh() {
+  const mgr = document.getElementById("f-manager").value;
+  const q = document.getElementById("f-q").value.trim().toLowerCase();
+  if (!mgr && !q) {
+    document.getElementById("tbody").innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>Chọn một Site Manager phía trên</h3>hoặc gõ từ khóa để tìm kiếm trên toàn bộ Data chung.</div></td></tr>`;
+    return;
+  }
+  const rows = MASTER_DATA.filter(a => {
+    if (mgr && (a.siteManager || "").trim() !== mgr) return false;
+    if (q && !([a.name, a.code, a.serial].join(" ").toLowerCase().includes(q))) return false;
+    return true;
+  });
+  document.getElementById("tbody").innerHTML = rows.length ? rows.map(a => `
+    <tr onclick="location.href='data.html?code=${encodeURIComponent(a.code)}'">
+      <td>${esc(a.no ?? "")}</td><td>${esc(a.name)}</td><td class="mono">${esc(a.code)}</td>
+      <td>${statusBadge(a.status)}</td><td>${esc(a.location) || "—"}</td><td>${esc(a.user) || "—"}</td>
+      <td class="num-cell">${fmtMoney(a.totalPrice)}</td><td class="num-cell">${fmtMoney(a.remaining)}</td>
+    </tr>
+  `).join("") : `<tr><td colspan="8"><div class="empty-state"><h3>Không tìm thấy tài sản</h3></div></td></tr>`;
+}
+
+renderContent();
+</script>
+</body>
+</html>

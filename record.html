@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Record · TAIKISHA FA Manager</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="app-shell" id="app-shell"></div>
+<script src="assets/data/record.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+renderShell("record", "Lịch sử cấp phát (Record)", "Lịch sử luân chuyển vị trí / người sử dụng của từng tài sản");
+
+let filtered = RECORD_DATA;
+let page = 1;
+const SIZE = 30;
+
+function renderContent() {
+  document.getElementById("page-content").innerHTML = `
+    <div class="panel">
+      <div class="toolbar">
+        <div class="field grow">
+          <label>Tìm kiếm</label>
+          <input type="search" id="f-q" placeholder="Tên tài sản, mã, vị trí, người dùng...">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>No</th><th>Tên tài sản</th><th>Mã</th><th>Từ ngày</th><th>Đến ngày</th><th>Vị trí</th><th>Người dùng</th><th>Site Manager</th><th>Job</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  `;
+  document.getElementById("f-q").addEventListener("input", (e) => { filterRows(e.target.value); page = 1; renderTable(); });
+  renderTable();
+}
+
+function filterRows(q) {
+  q = (q || "").trim().toLowerCase();
+  filtered = !q ? RECORD_DATA : RECORD_DATA.filter(r => [r.name, r.code, r.location, r.user, r.siteManager].join(" ").toLowerCase().includes(q));
+}
+
+function renderTable() {
+  const start = (page - 1) * SIZE;
+  const rows = filtered.slice(start, start + SIZE);
+  document.getElementById("tbody").innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${esc(r.no ?? "")}</td>
+      <td>${esc(r.name)}</td>
+      <td class="mono">${esc(r.code) || "—"}</td>
+      <td>${fmtDate(r.fromDate)}</td>
+      <td>${fmtDate(r.toDate)}</td>
+      <td>${esc(r.location) || "—"}</td>
+      <td>${esc(r.user) || "—"}</td>
+      <td>${esc(r.siteManager) || "—"}</td>
+      <td class="mono">${esc(r.job) || "—"}</td>
+    </tr>
+  `).join("") : `<tr><td colspan="9"><div class="empty-state"><h3>Không có kết quả</h3></div></td></tr>`;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / SIZE));
+  document.getElementById("pagination").innerHTML = `
+    <span>${filtered.length.toLocaleString("vi-VN")} dòng — trang ${page}/${totalPages}</span>
+    <span style="flex:1"></span>
+    <button class="btn btn-sm btn-ghost" id="pg-prev" ${page <= 1 ? "disabled" : ""}>← Trước</button>
+    <button class="btn btn-sm btn-ghost" id="pg-next" ${page >= totalPages ? "disabled" : ""}>Sau →</button>
+  `;
+  document.getElementById("pg-prev").onclick = () => { page--; renderTable(); };
+  document.getElementById("pg-next").onclick = () => { page++; renderTable(); };
+}
+
+renderContent();
+</script>
+</body>
+</html>
